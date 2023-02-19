@@ -1,0 +1,53 @@
+incarnation: scafi
+
+variables:
+  random: &random
+    min: 0
+    max: 5
+    step: 1
+    default: 2
+  range: &range
+    formula: 250
+
+_constants:
+  grain: &grain 500.0
+  retentionTime: &retentionTime 5.0
+
+environment:
+  type: Continuous2DEnvironment
+  parameters: []
+
+seeds:
+  scenario: *random
+  simulation: *random
+
+network-model:
+  type: ConnectWithinDistance
+  parameters: [*range]
+
+_reactions:
+  - program: &program
+    - time-distribution:
+        type: DiracComb
+        parameters: [ 0, 1 ]
+      type: Event
+      actions:
+        - type: RunScafiProgram
+          parameters: [it.unibo.scafi.examples.SimpleFlock, *retentionTime]
+    - program: send
+  - move: &move
+    - time-distribution:
+        type: DiracComb
+        parameters: [ 0, 1 ]
+      type: Event
+      actions: { type: MoveToTarget, parameters: [ destination, 10 ] }
+
+deployments:
+  type: Grid
+  parameters: [0, 0, 1000, 1000, 150, 150, 25, 25]
+  programs:
+  - *program
+  - *move
+  contents:
+  - molecule: grain
+    concentration: *grain
