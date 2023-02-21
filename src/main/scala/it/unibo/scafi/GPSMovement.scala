@@ -6,7 +6,7 @@ import it.unibo.scafi.space.optimization.RichPoint3D
 trait GPSMovement {
   self: StandardSensors with AggregateProgram with TimeUtils =>
 
-  def goto(destination: P)(maxVelocity: Double): P = {
+  def goto(destination: P, maxVelocity: Double = 1): P = {
     val distance = currentPosition().distance(destination)
     val direction = (destination: Point3D) - (currentPosition: Point3D)
     val velocity = direction * (1 / distance)
@@ -21,7 +21,7 @@ trait GPSMovement {
       Point3D(x, y, z)
     }
     val goal = rep(randomInBound())(goal => mux(isClose(goal))(randomInBound())(goal))
-    goto(goal)(maxVelocity)
+    goto(goal, maxVelocity)
   }
 
   def isClose(goal: P, dist: Double = 10): Boolean =

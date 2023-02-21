@@ -23,13 +23,13 @@ trait FollowLeaderLib {
 
   def spinAround(center: Boolean): Point3D = {
     val toCenter = sinkAt(center)
-    crossProduct(toCenter, Point3D(0, 0, 1))
+    toCenter.crossProduct(Point3D(0, 0, 1))
   }
 
   private def crossProduct(p: Point3D, other: Point3D): Point3D =
     Point3D(p.y * other.z - p.z * other.y, p.z * other.x - p.x * other.z, p.x * other.y - p.y * other.x)
 
-  def teamFormed(source: Boolean, targetDistance: Double, necessary: Int = 1): Boolean = {
+  def isTeamFormed(source: Boolean, targetDistance: Double, necessary: Int = 1): Boolean = {
     val potential = fastGradient(source, nbrRange)
     val totalDistance = excludingSelf.reifyField(nbrRange())
     val averageDistance = totalDistance.values.toList.sorted
@@ -37,6 +37,7 @@ trait FollowLeaderLib {
       .reduceOption(_ + _)
       .map(_ / necessary)
       .getOrElse(Double.PositiveInfinity)
+    node.put("average", averageDistance)
     val isFormed = CWithShare[Double, Boolean](potential, _ && _, averageDistance <= targetDistance, true)
     broadcastAlongWithShare(potential, isFormed, nbrRange)
   }

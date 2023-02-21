@@ -76,7 +76,7 @@ object ArrowShape {
 
   val DRONE_SHAPE: Polygon = new Polygon(Array(-1, 0, 1), Array(2, -2, 2), 3)
 
-  val DRONE_SIZE = 2.0
+  val DRONE_SIZE = 4.0
 
   val DRONE_COLOR: Color = Color.BLACK
 

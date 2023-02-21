@@ -14,7 +14,7 @@ class GroupExplorer extends BaseMovement {
     val collisionRange = 30
     rep(Point3D.Zero) { oldVelocity =>
       val center = mid() == 1
-      val towardsLeader = maintainUntil(sinkAt(center))(teamFormed(center, 40))
+      val towardsLeader = maintainUntil(sinkAt(center))(isTeamFormed(center, 40))
       val avoidCollision = separation(oldVelocity, OneHopNeighbourhoodWithinRange(collisionRange))
       val followLeaderVelocity = alignWithLeader(center, explore(Point3D.Zero, upperBound, maxVelocity = 1))
       (towardsLeader * towardsLeaderStrength + avoidCollision * collisionStrength + followLeaderVelocity * followLeaderVelocityStrength).normalize

@@ -7,13 +7,15 @@ import scala.language.postfixOps
 
 class TeamFormation extends BaseMovement {
   override protected def movementLogic(): Point3D = {
-    val team = teamFormation(
-      30,
-      300,
-      2,
-      leader => teamFormed(leader, 40) & countIn(leader) > 3
+    // a team is formed when the minimum distance between nodes is around 40 meters and the group has at least 3 nodes
+    val team = teamFormation( // internally it uses S
+      targetIntraDistance = 30,
+      targetExtraDistance = 300, // influence of the leader
+      separationWeight = 2,
+      condition = leader => isTeamFormed(leader, 40) & countIn(leader) > 3
     )
     node.put("leader", mid() == team.leader)
+
     team.insideTeam(k => alignWithLeader(mid() == k, explore(Point3D(0, 0, 0), Point3D(1000, 1000, 0), 1))).normalize
   }
 }

@@ -10,6 +10,7 @@ import it.unibo.scafi.{
   FlockLib,
   FollowLeaderLib,
   GPSMovement,
+  PatternFormationLib,
   PlanMovementLib,
   ProcessFix
 }
@@ -29,7 +30,8 @@ trait BaseMovement
     with ProcessFix
     with FollowLeaderLib
     with PlanMovementLib
-    with BlockS {
+    with BlockS
+    with PatternFormationLib {
 
   override def main(): Any = actuate(movementLogic())
 
