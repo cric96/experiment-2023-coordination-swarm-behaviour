@@ -33,7 +33,7 @@ _reactions:
       type: Event
       actions:
         - type: RunScafiProgram
-          parameters: [it.unibo.scafi.examples.LineForming, *retentionTime]
+          parameters: [it.unibo.scafi.examples.LineFormation, *retentionTime]
     - program: send
   - move: &move
     - time-distribution:

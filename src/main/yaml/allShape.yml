@@ -33,7 +33,7 @@ _reactions:
       type: Event
       actions:
         - type: RunScafiProgram
-          parameters: [it.unibo.scafi.examples.LineFormation, *retentionTime]
+          parameters: [it.unibo.scafi.examples.AllShape, *retentionTime]
     - program: send
   - move: &move
     - time-distribution:
@@ -44,7 +44,7 @@ _reactions:
 
 deployments:
   type: Grid
-  parameters: [0, 0, 1000, 1000, 300, 300, 25, 25]
+  parameters: [0, 0, 2000, 2000, 300, 300, 25, 25]
   programs:
   - *program
   - *move

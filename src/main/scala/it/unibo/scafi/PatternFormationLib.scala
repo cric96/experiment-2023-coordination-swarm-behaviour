@@ -13,7 +13,12 @@ trait PatternFormationLib extends {
     with ScafiAlchemistSupport
     with BlocksWithShare =>
 
-  def line(leader: Boolean, distance: Double, confidence: Double): Point3D = {
+  def line(
+      leader: Boolean,
+      distance: Double,
+      confidence: Double,
+      leaderVelocity: => Point3D = Point3D.Zero
+  ): Point3D = {
     val potential = fastGradient(leader)
     val nodes = getNodeInfo(potential)
     val (left, right) = orderedNodes(nodes).splitAt(nodes.size / 2)
@@ -23,7 +28,7 @@ trait PatternFormationLib extends {
     val rightSuggestions = right.zipWithIndex.map { case ((id, velocity), i) =>
       id -> (Point3D((i + 1) * distance, 0, 0) + velocity)
     }.toMap
-    mux(leader)(Point3D.Zero) {
+    mux(leader)(leaderVelocity) {
       val direction =
         broadcastAlongWithShare(potential, leftSuggestion ++ rightSuggestions, nbrRange).getOrElse(mid(), Point3D.Zero)
       node.put("suggestion", direction)
@@ -31,7 +36,12 @@ trait PatternFormationLib extends {
     }
   }
 
-  def centeredCircle(leader: Boolean, radius: Double, confidence: Double): Point3D = {
+  def centeredCircle(
+      leader: Boolean,
+      radius: Double,
+      confidence: Double,
+      leaderVelocity: => Point3D = Point3D.Zero
+  ): Point3D = {
     val potential = fastGradient(leader)
     val nodes = getNodeInfo(potential)
     val division = (math.Pi * 2) / nodes.size
@@ -39,13 +49,20 @@ trait PatternFormationLib extends {
       val angle = division * (i + 1)
       id -> (Point3D(math.sin(angle) * radius, math.cos(angle) * radius, 0) + v)
     }.toMap
-    mux(leader)(Point3D.Zero) {
+    mux(leader)(leaderVelocity) {
       val direction = broadcastAlongWithShare(potential, suggestion, nbrRange).getOrElse(mid(), Point3D.Zero)
       mux(direction.module < confidence)(Point3D.Zero)(direction.normalize)
     }
   }
 
-  def vShape(leader: Boolean, oldVelocity: Point3D, distance: Double, radius: Double, confidence: Double): Point3D = {
+  def vShape(
+      leader: Boolean,
+      oldVelocity: Point3D,
+      distance: Double,
+      radius: Double,
+      confidence: Double,
+      leaderVelocity: Point3D = Point3D.Zero
+  ): Point3D = {
     val potential = fastGradient(leader)
     val nodes = getNodeInfo(potential)
     val amount = ((Math.PI * 2) - radius) / 2 // - (Math.PI / 2)
@@ -58,7 +75,7 @@ trait PatternFormationLib extends {
     val rightSuggestions = right.zipWithIndex.map { case ((id, velocity), i) =>
       id -> (rightVersor * distance * (i + 1) + velocity)
     }.toMap
-    mux(leader)(Point3D.Zero) {
+    mux(leader)(leaderVelocity) {
       val direction =
         broadcastAlongWithShare(potential, leftSuggestion ++ rightSuggestions, nbrRange).getOrElse(mid(), Point3D.Zero)
       mux(direction.module < confidence)(Point3D.Zero)(direction.normalize)
@@ -85,15 +102,6 @@ trait PatternFormationLib extends {
     )
   }
 
-  def grid(separation: Double): Point3D = {
-    val neighboursVar = excludingSelf.reifyField(nbrVector())
-    neighboursVar
-      .filter { case ((id, p)) => math.abs(p.x) < separation && math.abs(p.y) < separation }
-      .values
-      .map(direction => -direction)
-      .foldLeft(Point3D.Zero)(_ + _)
-      .normalize
-  }
   private def orderedNodes(nodes: Set[(ID, Point3D)]): List[(ID, Point3D)] = nodes
     .filter(_._1 != mid())
     .toList

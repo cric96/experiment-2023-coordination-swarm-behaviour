@@ -33,7 +33,7 @@ _reactions:
       type: Event
       actions:
         - type: RunScafiProgram
-          parameters: [it.unibo.scafi.examples.CircleForming, *retentionTime]
+          parameters: [it.unibo.scafi.examples.CircleFormation, *retentionTime]
     - program: send
   - move: &move
     - time-distribution:
