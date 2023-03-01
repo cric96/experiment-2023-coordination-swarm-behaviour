@@ -16,6 +16,6 @@ class TeamFormation extends BaseMovement {
     )
     node.put("leader", mid() == team.leader)
 
-    team.insideTeam(k => alignWithLeader(mid() == k, explore(Point3D(0, 0, 0), Point3D(1000, 1000, 0), 1))).normalize
+    team.insideTeam(k => alignWithLeader(mid() == k, remember(brownian()))).normalize
   }
 }

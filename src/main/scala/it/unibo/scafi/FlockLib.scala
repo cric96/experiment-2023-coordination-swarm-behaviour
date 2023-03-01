@@ -125,7 +125,7 @@ trait FlockLib extends ScafiAlchemistSupport {
         .take(k)
         .toMap
   }
-  case class ProcessNeighbourhood(radius: Double) extends NeighbouringQuery {
+  case class LongRangeNeighborhood(radius: Double) extends NeighbouringQuery {
     override def query[L, A](local: L, valueAtCenter: A, accum: A => A): Map[Int, (L, A)] =
       sspawn2[Int, Unit, Map[Int, (L, A)]](
         id =>

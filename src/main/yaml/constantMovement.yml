@@ -33,7 +33,7 @@ _reactions:
       type: Event
       actions:
         - type: RunScafiProgram
-          parameters: [it.unibo.scafi.examples.RandomMovement, *retentionTime]
+          parameters: [it.unibo.scafi.examples.ConstantMovement, *retentionTime]
     - program: send
   - move: &move
     - time-distribution:
@@ -54,5 +54,5 @@ deployments:
 
 export:
   - type: SnapshotExporter
-    parameters: [ "snapshots", "branching", 100, 10 ]
+    parameters: [ "snapshots", "constant", 20, 5 ]
     data: [ ]

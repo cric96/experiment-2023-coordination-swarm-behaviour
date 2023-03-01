@@ -3,7 +3,8 @@ package it.unibo.scafi
 import it.unibo.alchemist.model.scafi.ScafiIncarnationForAlchemist._
 import it.unibo.scafi.space.Point3D
 import it.unibo.scafi.space.pimp.PimpPoint3D
-trait FollowLeaderLib {
+
+trait TeamFormationLib {
   self: AggregateProgram
     with StandardSensors
     with FieldUtils
@@ -13,21 +14,8 @@ trait FollowLeaderLib {
     with BlocksWithGC
     with BlocksWithShare
     with FlockLib
-    with ScafiAlchemistSupport =>
-
-  def alignWithLeader(source: Boolean, point: Point3D): Point3D =
-    GWithShare(source, point, identity[Point3D], nbrRange)
-
-  def sinkAt(source: Boolean): Point3D =
-    GWithShare[Point3D](source, Point3D.Zero, vector => vector + nbrVector(), nbrRange).normalize
-
-  def spinAround(center: Boolean): Point3D = {
-    val toCenter = sinkAt(center)
-    toCenter.crossProduct(Point3D(0, 0, 1))
-  }
-
-  private def crossProduct(p: Point3D, other: Point3D): Point3D =
-    Point3D(p.y * other.z - p.z * other.y, p.z * other.x - p.x * other.z, p.x * other.y - p.y * other.x)
+    with ScafiAlchemistSupport
+    with LeaderBasedLib =>
 
   def isTeamFormed(source: Boolean, targetDistance: Double, necessary: Int = 1): Boolean = {
     val potential = fastGradient(source, nbrRange)

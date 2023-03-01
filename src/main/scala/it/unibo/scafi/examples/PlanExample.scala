@@ -8,7 +8,7 @@ class PlanExample extends BaseMovement {
     val leader = mid() == 1
     val goToTop = alignWithLeader(leader, goto(Point3D(1000, 1000, 0)))
     val goToBottom = alignWithLeader(leader, goto(Point3D(0, 0, 0)))
-    val goal = plans
+    val goal = execute
       .once(
         plan {
           sinkAt(leader)
@@ -22,7 +22,7 @@ class PlanExample extends BaseMovement {
           broadcast(leader, isClose(Point3D(0, 0, 0)))
         }
       )
-      .execute()
+      .run()
     rep(Point3D.Zero) { velocity =>
       (separation(velocity, OneHopNeighbourhoodWithinRange(90)) + goal).normalize
     }

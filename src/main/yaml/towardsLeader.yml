@@ -51,3 +51,8 @@ deployments:
   contents:
   - molecule: grain
     concentration: *grain
+
+export:
+  - type: SnapshotExporter
+    parameters: [ "snapshots", "towards-leader", 10, 10 ]
+    data: [ ]

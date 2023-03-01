@@ -1,5 +1,6 @@
 [versions]
 alchemist = "25.11.0"
+ui = "5.0.0"
 
 [libraries]
 alchemist = { module = "it.unibo.alchemist:alchemist", version.ref = "alchemist" }
@@ -9,8 +10,9 @@ alchemist-incarnation-scafi = { module = "it.unibo.alchemist:alchemist-incarnati
 alchemist-incarnation-api = { module = "it.unibo.alchemist:alchemist-incarnation-scafi", version.ref = "alchemist"}
 alchemist-ui = { module = "it.unibo.alchemist:alchemist-ui-tooling", version.ref = "alchemist" }
 alchemist-geometry = { module = "it.unibo.alchemist:alchemist-maps", version.ref = "alchemist" }
+tooling-gui = { module = "org.danilopianini:javalib", version.ref = "ui" }
 [bundles]
-alchemist = ["alchemist", "alchemist-incarnation-scafi", "alchemist-swingui", "alchemist-ui", "alchemist-geometry"]
+alchemist = ["alchemist", "alchemist-incarnation-scafi", "alchemist-swingui", "alchemist-ui", "alchemist-geometry", "tooling-gui"]
 
 [plugins]
 multiJvmTesting = "org.danilopianini.multi-jvm-test-plugin:0.4.15"

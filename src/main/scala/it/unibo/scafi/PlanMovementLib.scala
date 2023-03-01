@@ -19,7 +19,7 @@ trait PlanMovementLib {
   case class Plan(computation: () => Point3D, condition: () => Boolean)
 
   class PlanExecutor(plans: Seq[Plan]) {
-    def execute(): Point3D = {
+    def run(): Point3D = {
       rep((0, Point3D.Zero)) { case (planId, _) =>
         val velocities = plans.map(_.computation())
         val conditions = plans.map(_.condition())
@@ -38,7 +38,7 @@ trait PlanMovementLib {
     def endWhen(condition: => Boolean): Plan = Plan(velocity, () => condition)
   }
 
-  object plans {
+  object execute {
     def once(plans: Plan*): PlanExecutor = new PlanExecutor(plans)
   }
 }

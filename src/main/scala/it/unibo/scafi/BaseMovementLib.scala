@@ -19,11 +19,23 @@ trait BaseMovementLib {
   def maintainUntil(velocity: P)(condition: Boolean): P =
     mux(condition)(Point3D.Zero)(velocity)
 
-  def obstacleAvoidance(obstacles: Seq[Point3D], weight: Double): Point3D =
-    -(obstacles
+  def obstacleAvoidance(
+      obstacles: Seq[Point3D],
+      minDistance: Double,
+      distanceWeightNormalization: Double = 100
+  ): Point3D = {
+    -obstacles
+      .map(obstacleDirection => (minDistance - obstacleDirection.module, obstacleDirection.normalize))
+      .filter(_._1 > 0)
+      .map { case (magnitude, direction) =>
+        direction * (magnitude / distanceWeightNormalization)
+      }
+      .foldLeft(Point3D.Zero)(_ + _)
+  }
+  /*-(obstacles
       .minByOption(_.module)
       .map(distance => distance.normalize * (weight / distance.module))
-      .getOrElse(Point3D.Zero): Point3D)
+      .getOrElse(Point3D.Zero): Point3D)*/
 
   private def randomInNegativeUnitSphere(scale: Double): P = {
     val x = randomGenerator().nextDouble() * 2 - 1

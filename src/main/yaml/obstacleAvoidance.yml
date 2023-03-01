@@ -65,3 +65,8 @@ deployments:
     contents:
       - molecule: obstacle
         concentration: true
+
+export:
+  - type: SnapshotExporter
+    parameters: [ "snapshots", "obstacle-avoid", 20, 10 ]
+    data: [ ]
