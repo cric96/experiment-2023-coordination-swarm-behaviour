@@ -63,9 +63,15 @@ File(rootProject.rootDir.path + "/src/main/yaml").listFiles()
             )
             // These are the program arguments
             args("-y", it.absolutePath, "-e", "$exportsDir/${it.nameWithoutExtension}-${System.currentTimeMillis()}")
-            if (System.getenv("CI") == "true" || batch == "true") {
+            if (System.getenv("CI") == "true") {
                 // If it is running in a Continuous Integration environment, use the "headless" mode of the simulator
                 // Namely, force the simulator not to use graphical output.
+                args("-hl", "-t", 10) // only for testing
+                if(variables.isNotEmpty()) {
+                    args("-var")
+                    variables.split(",").forEach { args(it) }
+                }
+            } else if (batch == "true") {
                 args("-hl", "-t", maxTime)
                 if(variables.isNotEmpty()) {
                     args("-var")

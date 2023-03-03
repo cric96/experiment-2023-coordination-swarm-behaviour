@@ -1,346 +1,428 @@
-#!/usr/bin/env python
-
-################################################################################
-########################### Script background info #############################
-################################################################################
-
-# - https://stackoverflow.com/questions/4455076/how-to-access-the-ith-column-of-a-numpy-multidimensional-array
-
-###############################################################################
-############################## Script imports #################################
-###############################################################################
-
-import sys
 import numpy as np
-import matplotlib.pyplot as plt
-import os
-from os import listdir
-from os.path import isfile, join
+import xarray as xr
 import re
-import pylab as pl                   # frange
-import math                          # isnan, isinf, ceil
-import pprint
-from collections import defaultdict
-import ruamel.yaml as yaml
-from textwrap import wrap
-#import copy  # copy.deepcopy(myDict)
-#import fnmatch # for fnmatch.fnmatch(str,glob)
-from functools import reduce
-import pdb
-import copy # for deepcopy
+from pathlib import Path
+import seaborn as sns
+import collections
+import pandas as pd
+sns.set()
+def distance(val, ref):
+    return abs(ref - val)
+vectDistance = np.vectorize(distance)
 
-#################################################################################
-############################## Script functions #################################
-#################################################################################
+def cmap_xmap(function, cmap):
+    """ Applies function, on the indices of colormap cmap. Beware, function
+    should map the [0, 1] segment to itself, or you are in for surprises.
 
-# returns: list of full paths of files (under directory `basedir`) filtered through a file prefix (`basefn`)
-def get_data_files(basedir, fileregex):
-  return [join(basedir,p) for p in listdir(basedir) if isfile(join(basedir,p)) and re.match(fileregex,p)]
+    See also cmap_xmap.
+    """
+    cdict = cmap._segmentdata
+    function_to_map = lambda x : (function(x[0]), x[1], x[2])
+    for key in ('red','green','blue'):
+        cdict[key] = map(function_to_map, cdict[key])
+    #        cdict[key].sort()
+    #        assert (cdict[key][0]<0 or cdict[key][-1]>1), "Resulting indices extend out of the [0, 1] segment."
+    return matplotlib.colors.LinearSegmentedColormap('colormap',cdict,1024)
 
-def remove_tuple_item_at_index(tpl,i):
-  return tpl[0:i]+tpl[(i+1):len(tpl)]
+def getClosest(sortedMatrix, column, val):
+    while len(sortedMatrix) > 3:
+        half = int(len(sortedMatrix) / 2)
+        sortedMatrix = sortedMatrix[-half - 1:] if sortedMatrix[half, column] < val else sortedMatrix[: half + 1]
+    if len(sortedMatrix) == 1:
+        result = sortedMatrix[0].copy()
+        result[column] = val
+        return result
+    else:
+        safecopy = sortedMatrix.copy()
+        safecopy[:, column] = vectDistance(safecopy[:, column], val)
+        minidx = np.argmin(safecopy[:, column])
+        safecopy = safecopy[minidx, :].A1
+        safecopy[column] = val
+        return safecopy
 
-# configs: list where each config is an N-dim tuple of (dim,val) tuples   
-# returns: dict where keys are (dims-dim) and values are lists of configs
-def group_by_varying_values_of(dim, configs):
-  res = defaultdict(list)
-  for config in configs:
-    configWithoutDim = tuple([d for d in config if d[0]!=dim])
-    res[configWithoutDim].append(config)
-  return res
-  
-# Globals used
-#   - t_start: beginning of time
-#   - t_step: length of a bucket
-#def bucket_pos(value):
-#  math.ceil((value-t_start)/t_step)-1
+def convert(column, samples, matrix):
+    return np.matrix([getClosest(matrix, column, t) for t in samples])
 
-# Returns a dict
-def process_files(filepaths):
-  return dict([process_file(fp) for fp in filepaths])
-  
-# Returns a pair (id,matrix) for each parsed file
-def process_file(filepath):
-  print("\n>>> Processing file: " + filepath)
-  # Open file handle
-  fh = open(filepath, "r")
-  
-  # Deduce some info from file name
-  parts = re.findall('_+([^-]+)-(\d+\.?\d*)', filepath.replace(join(basedir,basefn),''))
-  parts = map(lambda p: (p[0],format(float(p[1]),'.6f').rstrip('0')), parts)
-  parts = tuple(parts) # this must be hashable (and lists are not)
-  print("Dimensions: " + "; ".join(map(lambda x: str(x), parts)))
-  parts_suffix = "_".join(map("-".join,parts))
-  title = "; ".join(map("=".join,parts))
-  
-  # Gets the matrix (time X exports) from file content
-  # | time | export1 | ... | exportN |
-  # ----------------------------------
-  # |  t1  |    .    | ... |    .    |
-  # | .... |   ...   | ... |   ...   |
-  # |  tK  |    .    | ... |    .    |
-  # ----------------------------------
-  matrix = process_file_content(fh)
-  dimMatrix = matrix.transpose()
-  
-  # Closes file handle
-  fh.close()
-  
-  return (parts, dimMatrix)
-  
-def process_file_content(filehandle):
-  # Read data
-  lines = filehandle.readlines()
-  # Removes empty and comment lines and maps to float
-  data_rows = np.array([list(map(float, s.strip().split(" "))) for s in lines if len(s)>0 and s[0]!="#"], dtype='float')
-  return data_rows
+def valueOrEmptySet(k, d):
+    return (d[k] if isinstance(d[k], set) else {d[k]}) if k in d else set()
 
-def do_bucketize(contents, nbuckets=100, start=None, end=None):
-  res = dict()
-  for config, content in contents.items():
-    time = content[0]
-    if start==None:
-      start = time[0]
-    if end==None:
-      end = time[-1]
-    time_bins = np.linspace(start,end,nbuckets)
-    hist = np.histogram(time, time_bins)
-    # for ncol,data in enumerate(content):
-  # INCOMPLETE DEFINITION
-  return res
-  
-def merge_samples(contents, configs):
-  res = dict()
-  for config, sconfigs in configs.items():
-    nsamples = len(sconfigs)
-    print("\tCONFIGURATION: " + str(config) + " has " + str(nsamples) + " samples.")
+def mergeDicts(d1, d2):
+    """
+    Creates a new dictionary whose keys are the union of the keys of two
+    dictionaries, and whose values are the union of values.
 
-    matrices = [contents[sample_config] for sample_config in sconfigs]
-    time = list(map(lambda x: round(x), matrices[0][0]))  # time should be the same for all
-    matrices = list(map(lambda l: l[1:], matrices))  # skips the time dimension for each sample
-    # Assumption: the position of values in matrices reflects the time in a consistent manner
+    Parameters
+    ----------
+    d1: dict
+        dictionary whose values are sets
+    d2: dict
+        dictionary whose values are sets
 
-    # Printing statistics
-    # nplots = len(the_plots_labels)
-    # stats = dict()
-    # for expdim in range(0,nplots-1): # without 'time', which should be at index 0
-    #  for m in matrices:
-    #    curdata = m[expdim]
-    #    curstats = stats.get(expdim, np.zeros(len(curdata)))
-    #    stats[expdim] = curstats + curdata
-    # print(stats)
+    Returns
+    -------
+    dict
+        A dict whose keys are the union of the keys of two dictionaries,
+    and whose values are the union of values
 
-    # Crop the matrices so that they have the same shape (i.e., the minimum shape of all the involved matrices)
-    s = reduce(lambda s, m: min(s, m), [m.shape for m in matrices])  # uniform shape
-    matrices = [m[:s[0], :s[1]] for m in matrices]
-    time = time[:s[1]]
+    """
+    res = {}
+    for k in d1.keys() | d2.keys():
+        res[k] = valueOrEmptySet(k, d1) | valueOrEmptySet(k, d2)
+    return res
 
-    # Merge the matrices
-    merged = reduce(lambda a, b: a + b, matrices)
-    merged = list(map(lambda x: x / nsamples, merged))
-    merged.insert(0, time)  # reinserts time
-    res[config] = merged
-  return res
-  
-def plot(config,content,nf,pformat):
-  title = map("=".join,config)
-  if doWrap is not None: title = wrap("    ".join(title), 30)
-  print(enumerate(title))
-  print(excluded_titles[nf])
-  title = "\n".join([s.strip() for k,s in enumerate(title) if k not in excluded_titles[nf]])
-  parts_suffix = "_".join(map("-".join,config))
+def extractCoordinates(filename):
+    """
+    Scans the header of an Alchemist file in search of the variables.
 
-  plt.figure() # (figsize=(10,10), dpi=80)
-  plt.xlabel(the_plots_labels[pformat[0]])
-  plt.ylabel(y_labels[nf] if len(y_labels)>nf else "")
-  maxy = float("-inf")
-  for k in range(1,len(pformat)): # skip x-axis which is at pos 0
-      #pdb.set_trace()
-      plt.plot(content[pformat[0]], content[pformat[k]], color=the_plots_colors[nf][pformat[k]], label=the_plots_labels[pformat[k]], linewidth=line_widths[nf][pformat[k]],
-               linestyle=line_styles[nf][pformat[k]])
-      maxy = max(maxy, np.nanmax(content[pformat[k]]))
-  maxy = min(maxy + maxy * above_max_y[nf], limitPlotY[nf])
-  if nf in forceLimitPlotY: maxy = forceLimitPlotY[nf]
-  axes = plt.gca()
-  axes.set_ylim(ymax = maxy, ymin = startPlotY[nf])
-  if nf in forceLimitPlotX: axes.set_xlim(xmax = forceLimitPlotX[nf])
-  legend = plt.legend(loc= legendPosition[nf] if nf in legendPosition else 'upper right', prop={'size': legend_size},
-                      bbox_to_anchor=legendBBoxToAnchor[nf] if nf in legendBBoxToAnchor else None, ncol = legendColumns[nf] if nf in legendColumns else 1)
-  if nf in hlines:
-      for hline in hlines[nf]:
-          print(hline)
-          y = hline[0]
-          kwargs = hline[1]
-          plt.axhline(y, **kwargs)
-  if nf in vlines:
-      for vline in vlines[nf]:
-          x = vline[0]
-          kwargs = vline[1]
-          plt.axvline(x, **kwargs)
-  t = plt.title(title_prefix[nf]+title)
-  plt.subplots_adjust(top=.84)
-  suffix = (suffixes[nf] if nf in suffixes else "".join(map(str,pformat))) + "_" + parts_suffix
-  savefn = outdir+basefn+"_"+str(nf)+"_"+suffix +"." + figFormat
-  print("SAVE: " + savefn)
-  plt.tight_layout()
-  if nf in exportLegend and exportLegend[nf]==True:
-      legendsavefn = outdir+basefn+"_"+str(nf)+"_legend." + figFormat
-      export_legend(legend, legendsavefn)
-  plt.savefig(savefn, bbox_inches='tight', pad_inches = 0, format=figFormat)
-  plt.close()
+    Parameters
+    ----------
+    filename : str
+        path to the target file
+    mergewith : dict
+        a dictionary whose dimensions will be merged with the returned one
 
-def export_legend(legend, filename="legend.pdf"):
-    fig  = legend.figure
-    fig.canvas.draw()
-    bbox  = legend.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(filename, dpi="figure", bbox_inches=bbox, format=figFormat)
+    Returns
+    -------
+    dict
+        A dictionary whose keys are strings (coordinate name) and values are
+        lists (set of variable values)
 
-pp = pprint.PrettyPrinter(indent=4) # for logging purposes
+    """
+    with open(filename, 'r') as file:
+        #        regex = re.compile(' (?P<varName>[a-zA-Z._-]+) = (?P<varValue>[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?),?')
+        regex = r"(?P<varName>[a-zA-Z._-]+) = (?P<varValue>[^,]*),?"
+        dataBegin = r"\d"
+        is_float = r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?"
+        for line in file:
+            match = re.findall(regex, line.replace('Infinity', '1e30000'))
+            if match:
+                return {
+                    var : float(value) if re.match(is_float, value)
+                    else bool(re.match(r".*?true.*?", value.lower())) if re.match(r".*?(true|false).*?", value.lower())
+                    else value
+                    for var, value in match
+                }
+            elif re.match(dataBegin, line[0]):
+                return {}
 
-#######################################################################################
-############################## Script configuration ###################################
-#######################################################################################
+def extractVariableNames(filename):
+    """
+    Gets the variable names from the Alchemist data files header.
 
-sampling = True  # tells if there is a 'random' dimension for sampling
-bucketize = False # tells if there is a 'time' dimension to be split into buckets
-do_aggr_plotting = True
-forceLimitPlotY = None
-forceLimitPlotX = None
-doWrap = None
-limitPlotY = {}
-fill_between = []
-default_colors = ["black","red","blue","green"]
-the_plots_labels = []
-the_plots_formats = []
-the_plots_colors = []
-line_widths = []
-line_styles = []
-title_prefix = ""
+    Parameters
+    ----------
+    filename : str
+        path to the target file
 
-###################################################################################
-############################## Script preparation #################################
-###################################################################################
+    Returns
+    -------
+    list of list
+        A matrix with the values of the csv file
 
-script = sys.argv[0]
-if len(sys.argv)<5:
-  print("USAGE: plotter2 <plotConfig> <basedir> <fileregex> <basefn> <outdir>")
-  exit(0)
+    """
+    with open(filename, 'r') as file:
+        dataBegin = re.compile('\d')
+        lastHeaderLine = ''
+        for line in file:
+            if dataBegin.match(line[0]):
+                break
+            else:
+                lastHeaderLine = line
+        if lastHeaderLine:
+            regex = re.compile(' (?P<varName>\S+)')
+            return regex.findall(lastHeaderLine)
+        return []
 
-plotconfig = sys.argv[1]
-basedir = sys.argv[2]
-fileregex = sys.argv[3]
-basefn = sys.argv[4]
-print("===> " + sys.argv[5])
-outdir = os.path.join(sys.argv[5],'') if len(sys.argv)>=6 else os.path.join(basedir, "imgs/")
-if not os.path.exists(outdir):
-  os.makedirs(outdir)
-  
-files = get_data_files(basedir,fileregex)
+def openCsv(path):
+    """
+    Converts an Alchemist export file into a list of lists representing the matrix of values.
 
-print("Executing script: basedir=" + basedir + "\t fileregex=" + fileregex)
-print("Output directory for graphs: " + str(outdir))
-print("Base filename: " + str(basefn))
-print("Loading plot configurartion: " + str(plotconfig))
-print("Files to be processed: " + str(files))
-print("####################################")
+    Parameters
+    ----------
+    path : str
+        path to the target file
 
-############################# Plot configuration
+    Returns
+    -------
+    list of list
+        A matrix with the values of the csv file
 
-def parse_sim_option(pc, option, default=None):
-    opt = pc.get(option)
-    if type(opt) is dict:
-        defval = opt[opt.keys()[-1]]
-        opt = defaultdict(lambda: defval, opt)
-    elif type(opt) is list:
-        defval = opt[-1]
-        opt = defaultdict(lambda: defval, dict(enumerate(opt)))
-    elif not opt:
-        opt = defaultdict(lambda: default)
-    else: # single value
-        defval = opt
-        opt = defaultdict(lambda: defval)
-    print(option + " >> " + str(opt))
-    return opt
+    """
+    regex = re.compile('\d')
+    with open(path, 'r') as file:
+        lines = filter(lambda x: regex.match(x[0]), file.readlines())
+        return [[float(x) for x in line.split()] for line in lines]
 
-with open(plotconfig, 'r') as stream:
+def beautifyValue(v):
+    """
+    Converts an object to a better version for printing, in particular:
+        - if the object converts to float, then its float value is used
+        - if the object can be rounded to int, then the int value is preferred
+
+    Parameters
+    ----------
+    v : object
+        the object to try to beautify
+
+    Returns
+    -------
+    object or float or int
+        the beautified value
+    """
     try:
-        pc = yaml.load(stream, Loader=yaml.Loader)
-        figFormat = pc.get('format','pdf')
-        the_plots_labels = pc['the_plots_labels']
-        the_plots_formats = pc['the_plots_formats']
-        the_plots_colors = parse_sim_option(pc, 'the_plots_colors')
-        suffixes = parse_sim_option(pc, 'file_suffixes')
-        line_widths = parse_sim_option(pc, 'line_widths')
-        line_styles = parse_sim_option(pc, 'line_styles', defaultdict(lambda: 'solid'))
-        limitPlotY = parse_sim_option(pc, 'limit_plot_y', float('inf'))
-        startPlotY = parse_sim_option(pc, 'start_plot_y', 0)
-        forceLimitPlotY = parse_sim_option(pc, 'force_limit_plot_y')
-        forceLimitPlotX = parse_sim_option(pc, 'force_limit_plot_x')
-        above_max_y = parse_sim_option(pc, 'above_max_y', 0)
-        legendPosition = parse_sim_option(pc, 'legend_position')
-        exportLegend = parse_sim_option(pc, 'export_legend')
-        hlines = parse_sim_option(pc, 'hlines')
-        vlines = parse_sim_option(pc, 'vlines')
-        legendBBoxToAnchor = parse_sim_option(pc, 'legend_bbox_to_anchor')
-        legendColumns = parse_sim_option(pc, 'legend_columns')
-        y_labels = pc.get('y_labels',[])
-        legend_size = pc.get('legend_size',10)
-        #sampling = pc.get('sampling', False)
-        sampling = parse_sim_option(pc, 'sampling')
-        sampling_dim = parse_sim_option(pc, 'samplingField', 'random')
-        excluded_titles = parse_sim_option(pc, 'excluded_titles', [])
-        title_prefix = parse_sim_option(pc, 'title_prefix', '')
-        doWrap = pc.get('do_wrap')
-        plt.rcParams.update({'font.size': pc.get('font_size', 14)})
-    except yaml.YAMLError as exc:
-        print(exc)
-        exit(1)
+        v = float(v)
+        if v.is_integer():
+            return int(v)
+        return v
+    except:
+        return v
+def produce_chart(means, error, label):
+    data = pd.DataFrame({'time': current_experiment_means['time'] / 60, label: current_experiment_means[label], "y-error": current_experiment_errors[label]})
+    lower_bound = data.copy()
+    upper_bound = data.copy()
+    all_data = data.copy()
+    upper_bound[label] = upper_bound[label] - upper_bound['y-error']
+    lower_bound[label] = lower_bound[label] - lower_bound['y-error']
+    reference = all_data.append(upper_bound).append(lower_bound)
+    sns.lineplot(x="time", y=label, data=reference)
+if __name__ == '__main__':
+    # CONFIGURE SCRIPT
+    # Where to find Alchemist data files
+    directory = 'data'
+    # Where to save charts
+    output_directory = 'charts'
+    # How to name the summary of the processed data
+    pickleOutput = 'data_summary'
+    # Experiment prefixes: one per experiment (root of the file name)
+    experiments = ['rescue']
+    floatPrecision = '{: 0.3f}'
+    # Number of time samples
+    timeSamples = 100
+    # time management
+    minTime = 10
+    maxTime = 5400
+    timeColumnName = 'time'
+    logarithmicTime = False
+    # One or more variables are considered random and "flattened"
+    seedVars = ['random']
+    # Label mapping
+    class Measure:
+        def __init__(self, description, unit = None):
+            self.__description = description
+            self.__unit = unit
+        def description(self):
+            return self.__description
+        def unit(self):
+            return '' if self.__unit is None else f'({self.__unit})'
+        def derivative(self, new_description = None, new_unit = None):
+            def cleanMathMode(s):
+                return s[1:-1] if s[0] == '$' and s[-1] == '$' else s
+            def deriveString(s):
+                return r'$d ' + cleanMathMode(s) + r'/{dt}$'
+            def deriveUnit(s):
+                return f'${cleanMathMode(s)}' + '/{s}$' if s else None
+            result = Measure(
+                new_description if new_description else deriveString(self.__description),
+                new_unit if new_unit else deriveUnit(self.__unit),
+            )
+            return result
+        def __str__(self):
+            return f'{self.description()} {self.unit()}'
 
-############################# Script logic
+    centrality_label = 'H_a(x)'
+    def expected(x):
+        return r'\mathbf{E}[' + x + ']'
+    def stdev_of(x):
+        return r'\sigma{}[' + x + ']'
+    def mse(x):
+        return 'MSE[' + x + ']'
+    def cardinality(x):
+        return r'\|' + x + r'\|'
 
-print('*************************')
-print('*** PER FILE PLOTTING ***')
-print('*************************')
+    labels = {
+        'time': Measure('time', 'seconds'),
+        'avgDistanceTeam[mean]': Measure(r'team average distance', 'meter'),
+        'minDistance[min]': Measure(r'min', 'meter'),
+        'inDanger': Measure(r'danger', ''),
+        'dangerTriggered': Measure(r'triggers', ',nodes in danger (total)'),
+    }
+    def derivativeOrMeasure(variable_name):
+        if variable_name.endswith('dt'):
+            return labels.get(variable_name[:-2], Measure(variable_name)).derivative()
+        return Measure(variable_name)
+    def label_for(variable_name):
+        return labels.get(variable_name, derivativeOrMeasure(variable_name)).description()
+    def unit_for(variable_name):
+        return str(labels.get(variable_name, derivativeOrMeasure(variable_name)))
 
-# CONTENTS: a dict from file descriptors (dimension k/v pairs) to file contents (matrix data)
-#   Dictionary {key => matrix}
-#   file1 [d1=A  d2=B ] => export1=[...], ..., exportK=[...]
-#   file2 [d1=A' d2=B ] => export1=[...], ..., exportK=[...]  
-#   file3 [d1=A  d2=B'] => export1=[...], ..., exportK=[...]
-#   file4 [d1=A' d2=B'] => export1=[...], ..., exportK=[...]
-contents = process_files(files)
+    # Setup libraries
+    np.set_printoptions(formatter={'float': floatPrecision.format})
+    # Read the last time the data was processed, reprocess only if new data exists, otherwise just load
+    import pickle
+    import os
+    if os.path.exists(directory):
+        newestFileTime = max([os.path.getmtime(directory + '/' + file) for file in os.listdir(directory)], default=0.0)
+        try:
+            lastTimeProcessed = pickle.load(open('timeprocessed', 'rb'))
+        except:
+            lastTimeProcessed = -1
+        shouldRecompute = True #not os.path.exists(".skip_data_process") and newestFileTime != lastTimeProcessed
+        if not shouldRecompute:
+            try:
+                means = pickle.load(open(pickleOutput + '_mean', 'rb'))
+                stdevs = pickle.load(open(pickleOutput + '_std', 'rb'))
+            except:
+                shouldRecompute = True
+        if shouldRecompute:
+            timefun = np.logspace if logarithmicTime else np.linspace
+            means = {}
+            stdevs = {}
+            for experiment in experiments:
+                # Collect all files for the experiment of interest
+                import fnmatch
+                allfiles = filter(lambda file: fnmatch.fnmatch(file, experiment + '_*.csv'), os.listdir(directory))
+                allfiles = [directory + '/' + name for name in allfiles]
+                allfiles.sort()
+                # From the file name, extract the independent variables
+                dimensions = {}
+                for file in allfiles:
+                    dimensions = mergeDicts(dimensions, extractCoordinates(file))
+                dimensions = {k: sorted(v) for k, v in dimensions.items()}
+                # Add time to the independent variables
+                dimensions[timeColumnName] = range(0, timeSamples)
+                # Compute the matrix shape
+                shape = tuple(len(v) for k, v in dimensions.items())
+                # Prepare the Dataset
+                dataset = xr.Dataset()
+                for k, v in dimensions.items():
+                    dataset.coords[k] = v
+                if len(allfiles) == 0:
+                    print("WARNING: No data for experiment " + experiment)
+                    means[experiment] = dataset
+                    stdevs[experiment] = xr.Dataset()
+                else:
+                    varNames = extractVariableNames(allfiles[0])
+                    for v in varNames:
+                        if v != timeColumnName:
+                            novals = np.ndarray(shape)
+                            novals.fill(float('nan'))
+                            dataset[v] = (dimensions.keys(), novals)
+                    # Compute maximum and minimum time, create the resample
+                    timeColumn = varNames.index(timeColumnName)
+                    allData = { file: np.matrix(openCsv(file)) for file in allfiles }
+                    computeMin = minTime is None
+                    computeMax = maxTime is None
+                    if computeMax:
+                        maxTime = float('-inf')
+                        for data in allData.values():
+                            maxTime = max(maxTime, data[-1, timeColumn])
+                    if computeMin:
+                        minTime = float('inf')
+                        for data in allData.values():
+                            minTime = min(minTime, data[0, timeColumn])
+                    timeline = timefun(minTime, maxTime, timeSamples)
+                    # Resample
+                    for file in allData:
+                        #                    print(file)
+                        allData[file] = convert(timeColumn, timeline, allData[file])
+                    # Populate the dataset
+                    for file, data in allData.items():
+                        dataset[timeColumnName] = timeline
+                        for idx, v in enumerate(varNames):
+                            if v != timeColumnName:
+                                darray = dataset[v]
+                                experimentVars = extractCoordinates(file)
+                                darray.loc[experimentVars] = data[:, idx].A1
+                    # Fold the dataset along the seed variables, producing the mean and stdev datasets
+                    mergingVariables = [seed for seed in seedVars if seed in dataset.coords]
+                    means[experiment] = dataset.mean(dim = mergingVariables, skipna=True)
+                    stdevs[experiment] = dataset.std(dim = mergingVariables, skipna=True)
+            # Save the datasets
+            pickle.dump(means, open(pickleOutput + '_mean', 'wb'), protocol=-1)
+            pickle.dump(stdevs, open(pickleOutput + '_std', 'wb'), protocol=-1)
+            pickle.dump(newestFileTime, open('timeprocessed', 'wb'))
+    else:
+        means = { experiment: xr.Dataset() for experiment in experiments }
+        stdevs = { experiment: xr.Dataset() for experiment in experiments }
 
-# CONFIGURATIONS
-#   file1_2 [d1=*, d2=B ] => export1=[...], ..., exportK=[...]
-#   file3_4 [d1=*, d2=B'] => export1=[...], ..., exportK=[...]
-configs = contents.keys() # List of configs, where each config is an N-dim tuple of (k,v) tuples
-# if sampling:
-#   # Let's group configurations (individual datasets) into groups where only a sampling dimension varies
-#   # sconfigs is a dict where keys are (dims-'random') and values are lists of configs
-#   sconfigs = group_by_varying_values_of(sampling_dim, configs)
-#
-#   merged_contents = merge_samples(contents, sconfigs)
-#   for title,content in merged_contents.items():
-#     plot(title,content)
-# else:
-#   allcontents = dict()
-#   for nf, pformat in enumerate(the_plots_formats):
-#     allcontents[nf] = content
-#   for title,content in contents.items(): plot(title,allcontents)
+    # QUICK CHARTING
 
-for nf, pformat in enumerate(the_plots_formats):
-  c = copy.deepcopy(contents)
-  if nf in sampling and sampling[nf] == True:
-    print(str(nf) + " is to be sampled")
-    sconfigs = group_by_varying_values_of(sampling_dim[nf], configs)
-    c = merge_samples(c, sconfigs)
-  else:
-    print(str(nf) + " is NOT to be sampled")
-  for title, content in c.items():
-    plot(title, content, nf, pformat)
+    import matplotlib
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cmx
+    matplotlib.rcParams.update({'axes.titlesize': 12})
+    matplotlib.rcParams.update({'axes.labelsize': 10})
+    def make_line_chart(xdata, ydata, title = None, ylabel = None, xlabel = None, colors = None, linewidth = 1, errlinewidth = 0.5, figure_size = (6, 4)):
+        fig = plt.figure(figsize = figure_size)
+        ax = fig.add_subplot(1, 1, 1)
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        #        ax.set_ylim(0)
+        #        ax.set_xlim(min(xdata), max(xdata))
+        index = 0
+        for (label, (data, error)) in ydata.items():
+            #            print(f'plotting {data}\nagainst {xdata}')
+            lines = ax.plot(xdata, data, label=label, color=colors(index / (len(ydata) - 1)) if colors else None, linewidth=linewidth)
+            index += 1
+            if error is not None:
+                last_color = lines[-1].get_color()
+                ax.plot(xdata, data+error, label=None, color=last_color, linewidth=errlinewidth)
+                ax.plot(xdata, data-error, label=None, color=last_color, linewidth=errlinewidth)
+        return (fig, ax)
+    def generate_all_charts(means, errors = None, basedir=''):
+        viable_coords = { coord for coord in means.coords if means[coord].size > 1 }
+        for comparison_variable in viable_coords - {timeColumnName}:
+            mergeable_variables = viable_coords - {timeColumnName, comparison_variable}
+            for current_coordinate in mergeable_variables:
+                merge_variables = mergeable_variables - { current_coordinate }
+                merge_data_view = means.mean(dim = merge_variables, skipna = True)
+                merge_error_view = errors.mean(dim = merge_variables, skipna = True)
+                for current_coordinate_value in merge_data_view[current_coordinate].values:
+                    beautified_value = beautifyValue(current_coordinate_value)
+                    for current_metric in merge_data_view.data_vars:
+                        title = f'{label_for(current_metric)} for diverse {label_for(comparison_variable)} when {label_for(current_coordinate)}={beautified_value}'
+                        for withErrors in [True, False]:
+                            fig, ax = make_line_chart(
+                                title = title,
+                                xdata = merge_data_view[timeColumnName],
+                                xlabel = unit_for(timeColumnName),
+                                ylabel = unit_for(current_metric),
+                                ydata = {
+                                    beautifyValue(label): (
+                                        merge_data_view.sel(selector)[current_metric],
+                                        merge_error_view.sel(selector)[current_metric] if withErrors else 0
+                                    )
+                                    for label in merge_data_view[comparison_variable].values
+                                    for selector in [{comparison_variable: label, current_coordinate: current_coordinate_value}]
+                                },
+                            )
+                            ax.set_xlim(minTime, maxTime)
+                            ax.legend()
+                            fig.tight_layout()
+                            by_time_output_directory = f'{output_directory}/{basedir}/{comparison_variable}'
+                            Path(by_time_output_directory).mkdir(parents=True, exist_ok=True)
+                            figname = f'{comparison_variable}_{current_metric}_{current_coordinate}_{beautified_value}{"_err" if withErrors else ""}'
+                            for symbol in r".[]\/@:":
+                                figname = figname.replace(symbol, '_')
+                            fig.savefig(f'{by_time_output_directory}/{figname}.pdf')
+                            plt.close(fig)
+    for experiment in experiments:
+        current_experiment_means = means[experiment].fillna(0.0)
+        current_experiment_errors = stdevs[experiment].fillna(0.0)
+        def produce_chart(means, error, label):
+            plot_label = unit_for(label)
+            data = pd.DataFrame({'time (minutes)': current_experiment_means['time'] / 60, plot_label: current_experiment_means[label], "y-error": current_experiment_errors[label]})
+            lower_bound = data.copy()
+            upper_bound = data.copy()
+            all_data = data.copy()
+            upper_bound[plot_label] = upper_bound[plot_label] - upper_bound['y-error']
+            lower_bound[plot_label] = lower_bound[plot_label] - lower_bound['y-error']
+            reference = all_data.append(upper_bound).append(lower_bound)
+            sns.lineplot(x='time (minutes)', y=plot_label, data=reference)
+        produce_chart(current_experiment_means, current_experiment_errors, "minDistance[min]")
+        
+        #produce_chart(current_experiment_means, current_experiment_errors, "avgDistanceTeam[mean]")
+        
 
-
-if bucketize:
-  contents = do_bucketize(contents)
-  
-
+# Custom charting

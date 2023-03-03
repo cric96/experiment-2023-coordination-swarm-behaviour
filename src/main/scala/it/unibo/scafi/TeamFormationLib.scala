@@ -71,7 +71,7 @@ trait TeamFormationLib {
   ): Team = {
 
     val (leaderId, formed, velocity) = rep((mid(), false, Point3D.Zero)) { case (leaderId, formed, velocity) =>
-      branch(!formed) {
+      mux(!formed) {
         val leader = SWithShare(targetExtraDistance, nbrRange)
         val localLeader = broadcastAlongWithShare(fastGradient(leader, nbrRange), mid(), nbrRange)
         val isFormed = condition(leader)
@@ -84,6 +84,30 @@ trait TeamFormationLib {
         (leaderId, true, Point3D.Zero)
       }
     }
+    node.put("team", leaderId)
+    Team(leaderId, formed, velocity)
+  }
+  def teamFormation(
+      center: Boolean,
+      targetIntraDistance: Double,
+      separationWeight: Double,
+      condition: Boolean => Boolean
+  ): Team = {
+    val (leaderId, formed, velocity) = rep((mid(), false, Point3D.Zero)) { case (leaderId, formed, velocity) =>
+      mux(!formed) {
+        val leader = center
+        val localLeader = broadcastAlongWithShare(fastGradient(leader, nbrRange), mid(), nbrRange)
+        val isFormed = condition(leader)
+        val updateVelocity = (sinkAt(leader) + separation(
+          velocity,
+          OneHopNeighbourhoodWithinRange(targetIntraDistance)
+        ) * separationWeight).normalize
+        (localLeader, isFormed, updateVelocity)
+      } {
+        (leaderId, true, Point3D.Zero)
+      }
+    }
+    node.put("team", leaderId)
     Team(leaderId, formed, velocity)
   }
 }

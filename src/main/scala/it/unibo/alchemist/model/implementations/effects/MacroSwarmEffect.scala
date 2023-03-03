@@ -2,7 +2,7 @@ package it.unibo.alchemist.model.implementations.effects
 
 import it.unibo.alchemist.boundary.swingui.effect.api.Effect
 import it.unibo.alchemist.boundary.ui.api.Wormhole2D
-import it.unibo.alchemist.model.implementations.effects.ArrowShape._
+import it.unibo.alchemist.model.implementations.effects.MacroSwarmEffect._
 import it.unibo.alchemist.model.implementations.nodes._
 import it.unibo.alchemist.model.interfaces.{Environment, Node, Position, Position2D}
 import it.unibo.scafi.space.Point3D
@@ -14,7 +14,7 @@ import java.awt._
 import java.awt.geom._
 
 /** ad-hoc effect to draw drones, animal and station. */
-class ArrowShape extends Effect {
+class MacroSwarmEffect extends Effect {
   @ExportForGUI(nameToExport = "Track")
   private val trackEnabled: Boolean = false
 
@@ -50,7 +50,8 @@ class ArrowShape extends Effect {
       env: Environment[T, P],
       wormhole: Wormhole2D[P]
   ): Unit = {
-    val transform = getTransform(x, y, nodeSize.getVal, rotation(droneNode))
+    val currentRotation = rotation(droneNode)
+    val transform = getTransform(x, y, nodeSize.getVal, currentRotation)
     val shape = DRONE_SHAPE
     val color = droneColor(droneNode.getId, env.getNodeCount)
     val transformedShape = transform.createTransformedShape(shape)
@@ -70,17 +71,27 @@ class ArrowShape extends Effect {
         g.setColor(colorFaded)
         g.fill(transformedShape)
     }
-    g.setColor(color)
-    g.fill(transformedShape)
-    g.setColor(Color.BLACK)
-    val roundedTick = env.getSimulation.getTime.toDouble.toInt
-    if (roundedTick >= lastDraw) {
-      nodeManager.put(
-        "positions",
-        (positions :+ (env.getPosition(droneNode), rotation(droneNode))).takeRight(MAX_LENGTH)
-      )
-      nodeManager.put("lastDraw", lastDraw + timespan.getVal)
+    if (nodeManager.getOption("danger").contains(true)) {
+      g.setColor(Color.RED)
+      g.fill(transform.createTransformedShape(new Ellipse2D.Double(-3, -3, 3, 3)))
+    } else if (nodeManager.getOption("danger").isEmpty) {
+      g.setColor(color)
+      g.fill(transformedShape)
+      if (nodeManager.getOption[Boolean]("healer").contains(true)) {
+        g.setStroke(new BasicStroke(2))
+        g.setColor(Color.BLACK)
+        g.draw(transformedShape)
+      }
+      val roundedTick = env.getSimulation.getTime.toDouble.toInt
+      if (roundedTick >= lastDraw) {
+        nodeManager.put(
+          "positions",
+          (positions :+ (env.getPosition(droneNode), currentRotation)).takeRight(MAX_LENGTH)
+        )
+        nodeManager.put("lastDraw", lastDraw + timespan.getVal)
+      }
     }
+
   }
 
   private def rotation[T](node: Node[T]): Double = {
@@ -104,16 +115,14 @@ class ArrowShape extends Effect {
   }
 }
 
-object ArrowShape {
-  val CLOCK: Int = 20
+object MacroSwarmEffect {
+  val CLOCK: Int = 10
 
   val LENGTH: Int = 140
 
   val MAX_LENGTH: Int = 1000
 
   val MAX_COLOR: Int = 255
-
-  val JUMP_TO_COLOR = 100
 
   val TRANSPARENT = new Color(255, 255, 255, 0)
 
@@ -123,7 +132,7 @@ object ArrowShape {
 
   val DRONE_COLOR: Color = Color.BLACK
 
-  val SMOOTHING_FACTOR = 10
+  val SMOOTHING_FACTOR = 20.0
 
   def droneColor(id: Int, howMany: Int): Color = new Color(
     Color.HSBtoRGB(id.toFloat / howMany.toFloat, 1, 0.8f)

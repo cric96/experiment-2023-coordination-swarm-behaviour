@@ -1,0 +1,71 @@
+incarnation: scafi
+
+variables:
+  random: &random
+    min: 0
+    max: 5
+    step: 1
+    default: 2
+  range: &range
+    formula: 150
+
+_constants:
+  grain: &grain 500.0
+  retentionTime: &retentionTime 5.0
+
+environment:
+  type: Continuous2DEnvironment
+  parameters: []
+
+seeds:
+  scenario: *random
+  simulation: *random
+
+network-model:
+  type: ConnectWithinDistance
+  parameters: [*range]
+
+_reactions:
+  - program: &program
+    - time-distribution:
+        type: DiracComb
+        parameters: [ 0, 1 ]
+      type: Event
+      actions:
+        - type: RunScafiProgram
+          parameters: [it.unibo.scafi.examples.ObstacleAvoidance, *retentionTime]
+    - program: send
+  - move: &move
+    - time-distribution:
+        type: DiracComb
+        parameters: [ 0, 1 ]
+      type: Event
+      actions: { type: MoveToTarget, parameters: [ destination, 10 ] }
+layers:
+  - type: BidimensionalGaussianLayer
+    molecule: obstacle
+    parameters: [500, 500, 100, 100]
+
+deployments:
+  - type: Grid
+    parameters: [-1000, -1000, 1000, 1000, 100, 100, 25, 25]
+    programs:
+    - *program
+    - *move
+    contents:
+    - molecule: grain
+      concentration: *grain
+    - molecule: obstacle
+      concentration: false
+
+  - type: Grid
+    parameters: [ -900, -900, 900, 900, 850, 850, 300, 300 ]
+    programs:
+      - *program
+    contents:
+      - molecule: obstacle
+        concentration: true
+export:
+  - type: SnapshotExporter
+    parameters: [ "snapshots", "obstacle-avoid", 20, 10 ]
+    data: [ ]

@@ -8,8 +8,16 @@ class ObstacleAvoidance extends BaseMovement {
     val obstacles = excludingSelf.reifyField((nbr(sense[Boolean]("obstacle")), nbrVector()))
     val obstaclesPerceived = obstacles.filter(_._2._1).values.map(_._2).toSeq
     node.put("obstacles", obstacles)
-    mux(!sense[Boolean]("obstacle"))(
-      obstacleAvoidance(obstaclesPerceived, minDistance = 200, 400) + goto(Point3D(1000, 1000, 0))
-    )(Point3D.Zero).normalize
+    rep(Point3D.Zero)(old => {
+      mux(!sense[Boolean]("obstacle"))(
+        Point3D(1, 1, 0)
+          + separation(old, OneHopNeighbourhoodWithinRange(30)) + obstacleAvoidance(
+            obstaclesPerceived,
+            minDistance = 200,
+            50
+          )
+      )(Point3D.Zero).normalize
+    })
+
   }
 }

@@ -1,6 +1,6 @@
 [
   {
-    "type": "class it.unibo.alchemist.boundary.gui.effects.ArrowShape"
+    "type": "class it.unibo.alchemist.boundary.gui.effects.MacroSwarmEffect"
   },
   {
     "type": "class it.unibo.alchemist.boundary.gui.effects.DrawShape",

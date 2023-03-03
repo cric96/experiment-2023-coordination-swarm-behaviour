@@ -89,7 +89,7 @@ trait PatternFormationLib extends {
     node.put("distances", distances)
     // for all distances, the distance from the leader is between the target distance and the confidence
     val isFormed = distances.forall(d => d > targetDistance - confidence && d < targetDistance + confidence)
-    broadcastAlongWithShare(potential, isFormed, nbrRange)
+    broadcastAlongWithShare(potential, isFormed & distances.nonEmpty, nbrRange)
   }
 
   private def getNodeInfo(potential: Double): Set[(ID, Point3D)] = {

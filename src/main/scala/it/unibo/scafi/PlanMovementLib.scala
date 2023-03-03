@@ -18,16 +18,51 @@ trait PlanMovementLib {
 
   case class Plan(computation: () => Point3D, condition: () => Boolean)
 
-  class PlanExecutor(plans: Seq[Plan]) {
+  class PlanExecutor(plans: Seq[Plan], repeated: Boolean = false) {
     def run(): Point3D = {
       rep((0, Point3D.Zero)) { case (planId, _) =>
-        val velocities = plans.map(_.computation())
-        val conditions = plans.map(_.condition())
-        branch(conditions.length > planId) {
+        // val velocities = plans.map(_.computation())
+        // val conditions = plans.map(_.condition())
+        /*val (newId, v) = align(planId) { planId =>
+          val condition = plans(planId).condition()
+          val velocity = plans(planId).computation()
+          node.put("plan", planId)
+          val (_, stable) = rep((-1, false)) { case (oldNeigh, _) =>
+            val current = foldhood(0)(_ + _)(1)
+            (current, current == oldNeigh)
+          }
+          (mux(condition && stable)(planId + 1)(planId), velocity)
+        }
+
+        branch(plans.length > newId) {
+          (newId, v)
+        }(
+          (
+            if (repeated) { 0 }
+            else { planId },
+            Point3D.Zero
+          )
+        )*/
+        // val conditions = plans.map(_.condition())
+        // val velocities = plans.map(_.computation())
+        node.put("planId", planId)
+        branch(plans.length > planId) {
+          val conditions = plans.map(_.condition())
+          val velocities = plans.map(_.computation())
           val condition = conditions(planId)
           val velocity = velocities(planId)
-          (mux(condition)(planId + 1)(planId), velocity)
-        }((planId, Point3D.Zero))
+          val (_, stable) = rep((-1, false)) { case (oldNeigh, _) =>
+            val current = foldhood(0)(_ + _)(1)
+            (current, current == oldNeigh)
+          }
+          (mux(condition && stable)(planId + 1)(planId), velocity)
+        }(
+          (
+            if (repeated) { 0 }
+            else { planId },
+            Point3D.Zero
+          )
+        )
       }
     }._2
   }
@@ -40,5 +75,6 @@ trait PlanMovementLib {
 
   object execute {
     def once(plans: Plan*): PlanExecutor = new PlanExecutor(plans)
+    def repeat(plans: Plan*): PlanExecutor = new PlanExecutor(plans, true)
   }
 }
