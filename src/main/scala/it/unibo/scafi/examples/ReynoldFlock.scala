@@ -7,8 +7,8 @@ class ReynoldFlock extends BaseMovement {
     rep(brownian(2))(velocity =>
       reynold(
         velocity,
-        visionRange = OneHopNeighbourhoodNearestN(10),
-        separationRange = OneHopNeighbourhoodWithinRange(30),
+        visionRange = OneHopNeighbourhoodNearestN(5),
+        separationRange = OneHopNeighbourhoodWithinRange(10),
         separationFactor = 0.2,
         alignFactor = 1,
         cohesionFactor = 0.1
