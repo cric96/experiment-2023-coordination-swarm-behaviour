@@ -15,5 +15,5 @@ tooling-gui = { module = "org.danilopianini:javalib", version.ref = "ui" }
 alchemist = ["alchemist", "alchemist-incarnation-scafi", "alchemist-swingui", "alchemist-ui", "alchemist-geometry", "tooling-gui"]
 
 [plugins]
-multiJvmTesting = "org.danilopianini.multi-jvm-test-plugin:0.4.23"
+multiJvmTesting = "org.danilopianini.multi-jvm-test-plugin:0.5.8"
 taskTree = "com.dorongold.task-tree:2.1.0"
