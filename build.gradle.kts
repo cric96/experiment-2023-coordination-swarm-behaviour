@@ -2,7 +2,7 @@
 
 plugins {
     application
-    kotlin("jvm") version "1.7.20"
+    kotlin("jvm") version "1.7.22"
     alias(libs.plugins.multiJvmTesting) // Pre-configures the Java toolchains
     alias(libs.plugins.taskTree) // Helps debugging dependencies among gradle tasks
     scala
